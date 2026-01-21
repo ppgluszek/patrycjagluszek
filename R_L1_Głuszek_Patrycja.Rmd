@@ -1,0 +1,532 @@
+---
+title: "ADPS 2025Z --- Laboratorium 1 (rozwiązania)"
+author: "Patrycja Gluszek"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  html_notebook: default
+  html_document: default
+---
+```{r, echo=FALSE}
+pdf.options(encoding='ISOLatin2')
+```
+# Zadanie 1 (1 pkt)
+
+## Treść zadania
+
+Dla danych z ostatnich 18 miesięcy dotyczących wybranych dwóch spółek giełdowych:
+
+1. sporządź wykresy procentowych zmian kursów zamknięcia w zależności od daty,
+
+2. wykreśl i porównaj histogramy procentowych zmian kursów zamknięcia,
+
+3. wykonaj jeden wspólny rysunek z wykresami pudełkowymi zmian kursów zamknięcia.
+
+# Zadanie 2 (1,5 pkt)
+
+## Treść zadania
+
+1. Sporządź wykres liczby katastrof lotniczych w poszczególnych:
+
+* miesiącach roku (styczeń - grudzień),
+
+* dniach miesiąca (1-31),
+
+* dniach tygodnia (weekdays()).
+
+2. Narysuj jak w kolejnych latach zmieniały się:
+
+* liczba osób, które przeżyły katastrofy,
+
+* odsetek osób (w procentach), które przeżyły katastrofy.
+
+
+# Zadanie 3 (1 pkt)
+
+## Treść zadania
+
+1. Dla dwóch różnych zestawów parametrów rozkładu dwumianowego (rbinom):
+
+* Binom(20,0.2)
+
+* Binom(20,0.8)
+
+wygeneruj próby losowe składające się z M = 1000 próbek i narysuj wartości wygenerowanych danych.
+
+2. Dla każdego z rozkładów narysuj na jednym rysunku empiryczne i teoretyczne (użyj funkcji dbinom) funkcje prawdopodobieństwa, a na drugim rysunku empiryczne i teoretyczne (użyj funkcji pbinom) dystrybuanty. W obu przypadkach wyskaluj oś odciętych od 0 do 20.
+
+
+# Zadanie 4 (1,5 pkt)
+
+## Treść zadania
+
+1. Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek. 
+
+2. Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty. 
+
+3. We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2). 
+
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 1.  
+Porównanie procentowych zmian kursu zamknięcia KGHM vs PKO – ostatnie 18 miesięcy ujęcie całościowe
+
+
+```{r}
+#Porównanie procentowych zmian kursu zamknięcia KGHM vs PKO – ostatnie 18 miesięcy
+
+#KGHM
+Ticket = 'KGH'
+webLink = paste0('https://stooq.pl/q/d/l/?s=', Ticket, '&i=d')
+fileName = paste0(Ticket, '.csv')
+download.file(webLink, fileName)
+
+#PKO
+Ticket2 = 'PKO'
+webLink2 = paste0('https://stooq.pl/q/d/l/?s=', Ticket2, '&i=d')
+fileName2 = paste0(Ticket2, '.csv')
+download.file(webLink2, fileName2)
+
+#Wczytanie danych
+df_KGH = read.csv('KGH.csv')
+df_PKO = read.csv('PKO.csv')
+
+#Konwersja kolumny z datą
+df_KGH$Data = as.Date(df_KGH$Data)
+df_PKO$Data = as.Date(df_PKO$Data)
+
+#Obliczenie procentowych zmian kursu ZAMKNIĘCIA
+df_KGH$Zamkniecie_zm = with(df_KGH, c(NA, 100 * diff(Zamkniecie) / Zamkniecie[-length(Zamkniecie)]))
+df_PKO$Zamkniecie_zm = with(df_PKO, c(NA, 100 * diff(Zamkniecie) / Zamkniecie[-length(Zamkniecie)]))
+
+#Ograniczenie danych do ostatnich 18 miesięcy
+start_date = Sys.Date() - (18 * 30)
+df_KGH_18m = df_KGH[df_KGH$Data >= start_date & df_KGH$Data <= Sys.Date(), ]
+df_PKO_18m = df_PKO[df_PKO$Data >= start_date & df_PKO$Data <= Sys.Date(), ]
+
+#Wspólny wykres porównawczy
+par(mfrow = c(1, 1))
+plot(Zamkniecie_zm ~ Data, df_KGH_18m, type = 'l', col = 'lightblue',
+     xlab = 'Data', ylab = 'Procentowa zmiana kursu [%]',
+     main = 'Porównanie % zmian kursu zamknięcia: KGHM vs PKO')
+lines(df_PKO_18m$Data, df_PKO_18m$Zamkniecie_zm, col = 'lightcoral')
+legend('topright', legend = c('KGHM', 'PKO BP'),
+       col = c('lightblue', 'lightcoral'), lty = 1, bty = 'n')
+grid()
+```
+
+
+## Ad. 1.1.
+Porównanie procentowych zmian kursu zamknięcia KGHM vs PKO – ostatnie 18 miesięcy ujęcie miesięczne i kwartalne (dla przećwiczenia)
+
+
+```{r}
+#Wczytanie danych
+library(dplyr)
+library(lubridate)
+library(zoo)
+
+#Przygotowanie danych
+df_KGH$Data <- as.Date(df_KGH$Data)
+df_PKO$Data <- as.Date(df_PKO$Data)
+
+#Obliczenie procentowych zmian
+df_KGH$Zamkniecie_zm <- c(NA, 100 * diff(df_KGH$Zamkniecie) / df_KGH$Zamkniecie[-nrow(df_KGH)])
+df_PKO$Zamkniecie_zm <- c(NA, 100 * diff(df_PKO$Zamkniecie) / df_PKO$Zamkniecie[-nrow(df_PKO)])
+
+#Ograniczenie danych do ostatnich 18 miesięcy
+data_od <- Sys.Date() - months(18)
+df_KGH <- df_KGH %>% filter(Data >= data_od)
+df_PKO <- df_PKO %>% filter(Data >= data_od)
+
+#Agregacja miesięczna
+df_KGH_mies <- df_KGH %>%
+  mutate(Miesiac = floor_date(Data, "month")) %>%
+  group_by(Miesiac) %>%
+  summarise(Zmiana_srednia = mean(Zamkniecie_zm, na.rm=TRUE))
+
+df_PKO_mies <- df_PKO %>%
+  mutate(Miesiac = floor_date(Data, "month")) %>%
+  group_by(Miesiac) %>%
+  summarise(Zmiana_srednia = mean(Zamkniecie_zm, na.rm=TRUE))
+
+#Agregacja kwartalna
+df_KGH_kw <- df_KGH %>%
+  mutate(Kwartal = floor_date(Data, "quarter")) %>%
+  group_by(Kwartal) %>%
+  summarise(Zmiana_srednia = mean(Zamkniecie_zm, na.rm=TRUE))
+
+df_PKO_kw <- df_PKO %>%
+  mutate(Kwartal = floor_date(Data, "quarter")) %>%
+  group_by(Kwartal) %>%
+  summarise(Zmiana_srednia = mean(Zamkniecie_zm, na.rm=TRUE))
+
+#Wykresy: miesięczny i kwartalny
+par(mfrow=c(2,1), mar=c(4,4,3,1))
+
+#Zmiany miesięczne
+plot(df_KGH_mies$Miesiac, df_KGH_mies$Zmiana_srednia,
+     type = "l", col = "lightblue",
+     xlab = "Miesiąc", ylab = "Średnia zmiana [%]",
+     main = "Zmiany miesięczne", xaxt = "n")
+lines(df_PKO_mies$Miesiac, df_PKO_mies$Zmiana_srednia,
+      col = "lightcoral")  # ← tutaj była lty=2 – usunięta
+axis.Date(1, at = seq(min(df_KGH_mies$Miesiac), max(df_KGH_mies$Miesiac), by = "3 months"),
+           format = "%b %Y")
+legend("topright", legend = c("KGHM", "PKO"),
+       col = c("lightblue", "lightcoral"), lty = 1, bty = "n")
+grid()
+
+#Zmiany kwartalne
+plot(df_KGH_kw$Kwartal, df_KGH_kw$Zmiana_srednia,
+     type = "l", col = "lightblue",
+     xlab = "Kwartał", ylab = "Średnia zmiana [%]",
+     main = "Zmiany kwartalne", xaxt = "n")
+lines(df_PKO_kw$Kwartal, df_PKO_kw$Zmiana_srednia,
+      col = "lightcoral")  # ← tu też usunięte lty=2
+kwartaly <- df_KGH_kw$Kwartal
+etykiety_kw <- paste0("Q", quarter(kwartaly), " ", year(kwartaly))
+axis(1, at = kwartaly, labels = etykiety_kw)
+legend("topright", legend = c("KGHM", "PKO"),
+       col = c("lightblue", "lightcoral"), lty = 1, bty = "n")
+grid()
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 1.
+W ramach analizy pobrano dane dziennych kursów akcji spółek KGHM (KGH) oraz PKO BP (PKO) z serwisu stooq.pl w formacie CSV. Następnie dane zostały wczytane do środowiska R i przekształcono kolumny z datą. Dla każdej spółki obliczono procentowe dzienne zmiany kursu zamknięcia, korzystając z różnic między kolejnymi wartościami kursu. Dane zostały następnie ograniczone do ostatnich 18 miesięcy.
+
+Na końcu utworzono wspólny wykres liniowy, przedstawiający zmienność procentowych zmian kursów obu spółek w czasie. Wykres pozwala na wizualne porównanie dynamiki zmian cen akcji KGHM i PKO BP, z wyróżnieniem kolorystycznym dla każdej spółki oraz legendą ułatwiającą interpretację.
+
+## Ad. 1.1.
+W tym etapie rozszerzono wcześniejszą analizę dziennych zmian kursów zamknięcia spółek KGHM (KGH) i PKO BP (PKO), wykorzystując pakiety dplyr, lubridate oraz zoo do efektywnego przetwarzania i agregacji danych.Dane zostały wczytane i przygotowane. Dla każdej spółki obliczono dzienną procentową zmianę kursu zamknięcia. Dane ograniczono do ostatnich 18 miesięcy.
+
+Następnie dane zostały zagregowane do poziomu miesięcznego i kwartalnego przy użyciu floor_date() oraz group_by() i summarise() – obliczono średnie procentowe zmiany w tych okresach.
+Na końcu utworzono dwa wykresy porównawcze.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 1.2.  
+Porównanie histogramów procentowych zmian kursów zamknięcia KGHM i PKO
+
+```{r}
+#Histogramy procentowych zmian kursów zamknięcia
+
+par(mfrow=c(1,2), mar=c(4,4,3,1))
+
+#Ustalenie wspólny zakres osi X (dla porównywalności)
+xlim_range <- range(c(df_KGH$Zamkniecie_zm, df_PKO$Zamkniecie_zm), na.rm=TRUE)
+
+#Histogram KGHM
+hist(df_KGH$Zamkniecie_zm, breaks=40, prob=TRUE,
+     main='KGHM',
+     xlab='Zmiana [%]', col='lightblue', border='white',
+     xlim=xlim_range, cex.main=1.2, cex.lab=1)
+grid()
+lines(density(df_KGH$Zamkniecie_zm, na.rm=TRUE), col='blue', lwd=2)
+
+#Histogram PKO
+hist(df_PKO$Zamkniecie_zm, breaks=40, prob=TRUE,
+     main='PKO',
+     xlab='Zmiana [%]', col='lightcoral', border='white',
+     xlim=xlim_range, cex.main=1.2, cex.lab=1)
+grid()
+lines(density(df_PKO$Zamkniecie_zm, na.rm=TRUE), col='red', lwd=2)
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 1.2.
+W tej części przedstawiono rozkład dziennych procentowych zmian kursu zamknięcia dla spółek KGHM i PKO w formie histogramów z nałożonymi krzywymi gęstości. Histogramy pokazują, jak często występowały określone wielkości dziennych zmian — zarówno dodatnich, jak i ujemnych. Krzywe gęstości umożliwiają łatwiejsze porównanie kształtu rozkładów.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 1.3. 
+Porównanie histogramów procentowych zmian kursów zamknięcia KGHM i PKO
+
+```{r}
+#Wykres pudełkowy
+par(mfrow=c(1,1))
+boxplot(list(KGHM = df_KGH$Zamkniecie_zm,
+             PKO = df_PKO$Zamkniecie_zm),
+        col=c('lightblue','lightcoral'),
+        main='Porównanie zmian kursów zamknięcia',
+        ylab='Zmiana [%]')
+grid()
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 1.3.
+W tej części kodu utworzono wykres pudełkowy (boxplot) przedstawiający rozkład dziennych procentowych zmian kursu zamknięcia dla spółek KGHM i PKO. Dane wejściowe to kolumny Zamkniecie_zm z obu wcześniej przygotowanych zbiorów (df_KGH i df_PKO). Za pomocą funkcji boxplot() utworzono dwa pudełka w jednym wykresie. Każde pudełko zostało oznaczone innym kolorem (lightblue dla KGHM, lightcoral dla PKO). Dodatkowo ustawiono tytuł wykresu (main), etykietę osi Y (ylab) oraz dodano siatkę pomocniczą (grid()), poprawiającą czytelność.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 2.1.
+Wykres liczby katastrof lotniczych w poszczególnych miesiądach, dniach i dniach tygodnia
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Wczytanie danych
+kat <- read.csv('crashes.csv')
+
+#Dodanie kolumny z rokiem, miesiącem, dniem miesiąca i dniem tygodnia
+kat$Date <- as.Date(kat$Date, format = '%m/%d/%Y')
+kat$Year <- as.numeric(format(kat$Date, "%Y"))
+kat$Month <- as.numeric(format(kat$Date, "%m"))
+kat$Day <- as.numeric(format(kat$Date, "%d"))
+kat$Weekday <- weekdays(kat$Date)
+
+#Liczba katastrof w poszczególnych miesiącach
+month_counts <- table(kat$Month)
+barplot(month_counts, col='lightblue', xlab='Miesiąc', ylab='Liczba katastrof',
+main='Liczba katastrof w miesiącach roku')
+grid()
+
+#Liczba katastrof w poszczególnych dniach miesiąca
+day_counts <- table(kat$Day)
+barplot(day_counts, col='lightgreen', xlab='Dzień miesiąca', ylab='Liczba katastrof',
+main='Liczba katastrof w dniach miesiąca')
+grid()
+
+#Liczba katastrof w poszczególnych dniach tygodnia
+weekday_counts <- table(kat$Weekday)
+barplot(weekday_counts, col='lightcoral', xlab='Dzień tygodnia', ylab='Liczba katastrof',
+main='Liczba katastrof w dniach tygodnia')
+grid()
+
+invisible(month_counts)
+invisible(day_counts)
+invisible(weekday_counts)
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 2.1.
+Plik crashes.csv został zaimportowany do środowiska R przy użyciu funkcji read.csv(), a wynik zapisano w obiekcie kat. Kolumna Date została przekonwertowana do typu daty (Date) z odpowiednim formatem ('%m/%d/%Y'). Na podstawie daty utworzono nowe kolumny: Year – rok zdarzenia, Month – numer miesiąca, Day – dzień miesiąca, Weekday – nazwa dnia tygodnia (funkcja weekdays()).
+
+Utworzono agregację danych. Za pomocą funkcji table() policzono liczbę katastrof w poszczególnych: miesiącach (month_counts), dniach miesiąca (day_counts), dniach tygodnia (weekday_counts).
+
+Dla każdej z powyższych agregacji utworzono osobny wykres słupkowy (barplot) z odpowiednim kolorem (lightblue, lightgreen, lightcoral).Dodano etykiety osi (xlab, ylab), tytuły wykresów (main) oraz siatkę (grid()) dla poprawy czytelności.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 2.2.
+Wykres jak kolejnych latach zmieniały się: liczba osób, które przeżyły katastrofy i odsetek osób (w procentach), które przeżyły katastrofy
+
+```{r}
+#Dodanie kolumny liczby przeżyłych
+kat$Survivors <- kat$Aboard - kat$Fatalities
+
+#Agregacja liczby przeżyłych osób w każdym roku
+survivors_agr <- aggregate(Survivors ~ Year, kat, FUN = sum)
+
+#Wykres liczby przeżyłych
+plot(survivors_agr$Year, survivors_agr$Survivors, type='h', col='blue',
+     xlab='Rok', ylab='Liczba przeżyłych', main='Liczba osób, które przeżyły katastrofy w roku')
+grid()
+
+#Obliczenie procentu przeżyłych w każdym roku
+kat$SurvivalRate <- (kat$Survivors / kat$Aboard) * 100
+
+survival_rate_agr <- aggregate(SurvivalRate ~ Year, kat, FUN = mean, na.rm=TRUE)
+
+#Wykres procentu przeżyłych
+plot(survival_rate_agr$Year, survival_rate_agr$SurvivalRate, type='h', col='darkgreen',
+     xlab='Rok', ylab='Odsetek przeżyłych (%)', main='Procent osób, które przeżyły katastrofy w roku')
+grid()
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 2.2.
+Na podstawie danych o liczbie pasażerów (Aboard) i ofiar (Fatalities) obliczono nową kolumnę Survivors, określającą liczbę osób, które przeżyły każdą katastrofę.
+
+Dane zagregowano rocznie (aggregate()), sumując liczbę przeżyłych (Survivors ~ Year). Wyniki przedstawiono na wykresie kolumnowym, pokazującym liczbę ocalałych w poszczególnych latach.
+
+Następnie obliczono procent przeżywalności dla każdej katastrofy (SurvivalRate = Survivors / Aboard * 100) i uśredniono rocznie (aggregate(..., mean)). Otrzymane wartości zaprezentowano na drugim wykresie kolumnowym, przedstawiającym średni odsetek osób, które przeżyły w danym roku.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 3.1.
+Wygenerowano próby losowe składające się z M = 1000 próbek. Dla dwóch różnych zestawów parametrów rozkładu dwumianowego (rbinom): Binom(20,0.2), Binom(20,0.8).
+
+```{r}
+
+#Parametry
+n = 20
+M = 1000
+
+#Rozkład Binom(20, 0.2)
+prob1 = 0.2
+proba1 = rbinom(M, size = n, prob = prob1)
+plot(proba1, main = "Wartości próbek - Binom(20, 0.2)", ylab = "Wartości próbek", xlab = "Indeks próbki")
+
+#Rozkład Binom(20, 0.8)
+prob2 = 0.8
+proba2 = rbinom(M, size = n, prob = prob2)
+plot(proba2, main = "Wartości próbek - Binom(20, 0.8)", ylab = "Wartości próbek", xlab = "Indeks próbki")
+
+par(mfrow=c(1,1))
+```
+
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 3.1.
+Wygenerowano dwie serie danych losowych z rozkładu dwumianowego dla: Binom(20,0.2) i Binom(20,0.8). Każda próba składa się z M = 1000 obserwacji, a liczba prób w jednym doświadczeniu to n = 20.
+
+Do generacji danych użyto funkcji rbinom(), która zwraca losowe wartości z rozkładu dwumianowego o zadanych parametrach.
+
+Następnie, dla każdej z prób, wykonano wykres przedstawiający wartości wygenerowanych próbek (funkcja plot()), co pozwala wizualnie ocenić rozkład i zakres uzyskanych wyników.
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 3.2.
+Dla każdego z rozkładów narysowano na jednym rysunku empiryczne i teoretyczne (użyto funkcji dbinom) funkcje prawdopodobieństwa, a na drugim rysunku empiryczne i teoretyczne (użyto funkcji pbinom) dystrybuanty. W obu przypadkach wyskalowano oś odciętych od 0 do 20.
+
+```{r}
+#Parametry
+n = 20
+M = 1000
+
+#Generacja próbek
+prob1 = 0.2
+prob2 = 0.8
+
+set.seed(123)  # dla powtarzalności
+proba1 = rbinom(M, size = n, prob = prob1)
+proba2 = rbinom(M, size = n, prob = prob2)
+
+#Zakres osi x
+x_vals = 0:n
+
+#Empiryczne funkcje prawdopodobieństwa
+emp_prob1 = table(proba1)/M
+emp_prob2 = table(proba2)/M
+
+#WYKRES 1: Funkcje prawdopodobieństwa (empiryczne + teoretyczne)
+plot(x_vals, dbinom(x_vals, size = n, prob = prob1), type="h", lwd=2, col="red",
+     xlab="x", ylab="P(X=x)", main="Funkcje prawdopodobieństwa dla Binom(20,0.2) i Binom(20,0.8)",
+     ylim=c(0,0.25), xlim=c(0,20))
+points(as.numeric(names(emp_prob1)), emp_prob1, col="red", pch=16)
+
+lines(x_vals, dbinom(x_vals, size = n, prob = prob2), type="h", lwd=2, col="blue")
+points(as.numeric(names(emp_prob2)), emp_prob2, col="blue", pch=16)
+
+legend("topright", legend=c("teoretyczna Binom(20,0.2)", "empiryczna Binom(20,0.2)",
+                            "teoretyczna Binom(20,0.8)", "empiryczna Binom(20,0.8)"),
+       col=c("red","red","blue","blue"), lwd=c(2,NA,2,NA), pch=c(NA,16,NA,16))
+
+grid()
+
+#WYKRES 2: Dystrybuanty (empiryczne + teoretyczne)
+plot(ecdf(proba1), main="Dystrybuanty dla Binom(20,0.2) i Binom(20,0.8)",
+     xlab="x", ylab="F(x)", col="red", xlim=c(0,20))
+curve(pbinom(x, size=n, prob=prob1), add=TRUE, col="red", lwd=2)
+
+lines(ecdf(proba2), col="blue")
+curve(pbinom(x, size=n, prob=prob2), add=TRUE, col="blue", lwd=2)
+
+legend("topleft", legend=c("emp. Binom(20,0.2)", "teor. Binom(20,0.2)",
+                           "emp. Binom(20,0.8)", "teor. Binom(20,0.8)"),
+       col=c("red","red","blue","blue"), lwd=c(1,2,1,2), lty=1)
+grid()
+```
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 3.2.
+
+Wygenerowano po 1000 próbek z obu rozkładów (rbinom), z ustalonym ziarnem (set.seed(123)) dla powtarzalności wyników. Obliczono empiryczne funkcje prawdopodobieństwa (table(proba)/M) i zestawiono je z wartościami teoretycznymi (dbinom). Na pierwszym wykresie pokazano na jednym rysunku obie funkcje prawdopodobieństwa – empiryczną i teoretyczną – dla obu rozkładów, w różnych kolorach (czerwony i niebieski). Na drugim wykresie przedstawiono dystrybuanty empiryczne (ecdf) oraz teoretyczne (pbinom) również dla obu rozkładów. Zastosowano legendy, siatkę (grid()) i ograniczenie osi X do zakresu 0–20, zgodnie z treścią zadania.
+
+
+# Zadanie 4 (1,5 pkt)
+
+## Treść zadania
+
+1. Dla rozkładu dwumianowego Binom(20, 0.2) wygeneruj trzy próby losowe składające się z M = 100, 1000 i 10000 próbek. 
+
+2. Dla poszczególnych prób wykreśl empiryczne i teoretyczne funkcje prawdopodobieństwa, a także empiryczne i teoretyczne dystrybuanty. 
+
+3. We wszystkich przypadkach oblicz empiryczne wartości średnie i wariancje. Porównaj je ze sobą oraz z wartościami teoretycznymi dla rozkładu Binom(20, 0.2).
+
+---
+
+## ROZWIĄZANIE
+
+## Ad. 4.1., 4.2., 4.3.
+
+```{r}
+#Parametry zadania
+M_values <- c(100, 1000, 10000)
+n <- 20
+p <- 0.2
+
+#Funkcja do analizy rozkładu dwumianowego
+analyze_binom <- function(M, n, p) {
+  # Generacja próby
+  proba <- rbinom(M, size=n, prob=p)
+  
+  #Obliczenie średniej i wariancji
+  m <- mean(proba)
+  v <- var(proba)
+  cat(paste0("M = ", M, ": empiryczna średnia = ", round(m,4),
+             ", empiryczna wariancja = ", round(v,4), "\n"))
+  cat(paste0("Średnia teoretyczna = ", n*p, 
+             ", wariancja teoretyczna = ", n*p*(1-p), "\n\n"))
+  
+  #Empiryczna funkcja prawdopodobieństwa
+  x <- 0:n
+  freq_emp <- as.numeric(table(factor(proba, levels=x))) / M
+  prob_theor <- dbinom(x, size=n, prob=p)
+  
+  #Wykres funkcji prawdopodobieństwa
+  plot(x, freq_emp, type='h', col='blue', lwd=2,
+       xlab='x', ylab='f(x)', main=paste0('Funkcja prawdopodobieństwa M=', M),
+       xlim=c(0,n))
+  points(x, freq_emp, col='blue', pch=16)
+  lines(x, prob_theor, type='h', col='red', lwd=2)
+  points(x, prob_theor, col='red', pch=16)
+  legend('topright', legend=c('empiryczna','teoretyczna'),
+         col=c('blue','red'), lwd=2)
+  grid()
+  
+  #Dystrybuanta empiryczna i teoretyczna
+  plot(ecdf(proba), col='blue',
+       main=paste0('Dystrybuanta empiryczna i teoretyczna M=', M),
+       xlab='x', ylab='F(x)')
+  lines(x, pbinom(x, size=n, prob=p), type='s', col='red', lwd=2)
+  grid()
+  legend('bottomright', legend=c('empiryczna','teoretyczna'),
+         col=c('blue','red'), lwd=2)
+}
+
+#Analiza dla wszystkich prób
+par(mfrow=c(3,2))
+for (M in M_values) {
+  analyze_binom(M, n, p)
+}
+par(mfrow=c(1,1))
+```
+
+
+## PODSUMOWANIE PODJĘTYCH DZIAŁAŃ
+
+## Ad. 4.1., 4.2., 4.3.
+W tym fragmencie przeprowadzono analizę rozkładu dwumianowego Binom(20,0.2) dla trzech różnych liczności prób: M = 100, 1000 i 10000. Dla każdej próby: wygenerowano dane za pomocą rbinom(), obliczono empiryczną średnią i wariancję oraz porównano je z wartościami teoretycznymi, narysowano na jednym wykresie empiryczną i teoretyczną funkcję prawdopodobieństwa oraz na drugim — empiryczną i teoretyczną dystrybuantę.

@@ -1,0 +1,292 @@
+---
+title: "ADPS 2025Z --- Laboratorium 4 - rozwiązania"
+author: "Patrycja Głuszek"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+  html_document: default
+  html_notebook: default
+---
+
+```{r, echo=FALSE}
+pdf.options(encoding='ISOLatin2')
+```
+
+# Zadanie 1 (1,5 pkt)
+
+## Treść zadania 
+
+Dla kursu zamknięcia dolara amerykańskiego (USDPLN):
+
+* Narysuj wykresy pudełkowe ilustrujące rozkłady kursu dla ostatnich sześciu miesięcy (osobno dla każdego miesiąca od czerwca 2025 do listopada 2025).
+
+* Korzystając z metody analizy wariancji, zweryfikuj hipotezę o równości wartości średnich kursów w  ostatnich sześciu miesiącach. Skomentuj uzyskane wyniki.
+
+* Przeprowadź analizę odstępstw od średniej metodami Tukeya i Bonferroniego. Skomentuj uzyskane wyniki.
+
+* Przeprowadź testy prównujące kursy w ostatnich sześciu miesiącach, bez zakładania normalności ich rozkładów. Skomentuj uzyskane wyniki. 
+
+
+## Rozwiązanie
+
+Tu umieść swoje rozwiązanie.
+
+```{r}
+read_kursy <- function(Symbol, dateStart, dateEnd) {
+  webLink  <- paste0('https://stooq.pl/q/d/l/?s=', Symbol, '&i=d')
+  fileName <- paste0(Symbol, '.csv')
+  download.file(webLink, fileName, quiet = TRUE)
+  df <- read.csv(fileName)
+  df$Data <- as.Date(df$Data)
+  df <- subset(df, Data >= as.Date(dateStart) & Data <= as.Date(dateEnd))
+  df <- subset(df, select = c(Data, Zamkniecie))
+  names(df) <- c('Data', 'Kurs')
+  df
+}
+
+dateStart <- '2025-06-01'
+dateEnd   <- '2025-11-30'
+df_usd <- read_kursy('USDPLN', dateStart, dateEnd)
+df_usd$Miesiac <- format(df_usd$Data, '%Y-%m')
+
+par(mfrow = c(2,3), mar = c(4,4,2,1))
+for (m in unique(df_usd$Miesiac)) {
+  boxplot(Kurs ~ (Miesiac == m), data = subset(df_usd, Miesiac == m),
+          main = m, ylab = 'Kurs [zł]', xaxt = 'n')
+  grid()
+}
+par(mfrow = c(1,1))
+
+boxplot(Kurs ~ Miesiac, data = df_usd,
+        xlab = 'Miesiąc', ylab = 'Kurs [zł]', main = 'USDPLN — czerwiec–listopad 2025')
+grid()
+
+aov_usd <- aov(Kurs ~ Miesiac, data = df_usd)
+summary(aov_usd)
+
+tukey_usd <- TukeyHSD(aov_usd)
+print(tukey_usd)
+plot(tukey_usd)
+
+bonf_usd <- pairwise.t.test(df_usd$Kurs, df_usd$Miesiac, p.adj = 'bonf')
+bonf_usd
+
+kw_usd <- kruskal.test(Kurs ~ Miesiac, data = df_usd)
+kw_usd
+
+pw_wilcox_usd <- pairwise.wilcox.test(df_usd$Kurs, df_usd$Miesiac, p.adjust.method = 'bonferroni')
+pw_wilcox_usd
+```
+
+## WNIOSKI
+
+**Hipotezy:**
+
+$H_0$: Średnie wartości kursu USDPLN w miesiącach od czerwca do listopada 2025 są równe.
+
+$H_1$: Istnieje co najmniej jedna para miesięcy, dla której średnie kursy USDPLN różnią się istotnie statystycznie.
+
+1. Wykresy pudełkowe Rozkłady kursu USDPLN w poszczególnych miesiącach (czerwiec–listopad 2025) różnią się zauważalnie. Widać, że mediana kursu w czerwcu była wyraźnie wyższa niż w kolejnych miesiącach, a rozrzut danych zmieniał się w czasie.
+
+2. Analiza wariancji (ANOVA) Wynik testu: Hipoteza zerowa o równości średnich kursów została odrzucona. Średnie kursy USDPLN w badanych miesiącach różnią się istotnie statystycznie.
+
+3. Test Tukeya (post-hoc). Kurs w czerwcu był istotnie wyższy niż w lipcu, sierpniu, wrześniu, październiku i listopadzie (p‑adj < 0.01). Dodatkowo różnice istotne wystąpiły między sierpniem a wrześniem ($p\approx 0.02$) oraz między wrześniem a listopadem ($p\approx 0.0015$). Pozostałe pary miesięcy nie wykazały istotnych różnic.
+
+4. Test Bonferroniego (porównania parami t‑test). Wyniki potwierdzają kluczowe różnice: czerwiec vs wszystkie pozostałe miesiące (p < 0.01), wrzesień vs sierpień ($p\approx 0.025$), listopad vs wrzesień ($p\approx 0.0016$). Bonferroni jest bardziej konserwatywny, więc mniej par uznano za istotne, ale wnioski są zgodne z Tukeyem.
+
+5. Testy nieparametryczne (Kruskal–Wallis + Wilcoxon). Potwierdza różnice między miesiącami bez zakładania normalności. Porównania parami (Wilcoxon + Bonferroni): czerwiec różni się istotnie od lipca, sierpnia, września i października, wrzesień różni się od sierpnia i listopada, listopad różni się od września. Wyniki są spójne z analizą parametryczną.
+
+Zgodność wyników uzyskanych metodami parametrycznymi i nieparametrycznymi potwierdza odrzucenie hipotezy zerowej i wskazuje na istotne statystycznie różnice kursu USDPLN pomiędzy analizowanymi miesiącami.
+
+**Wnioski:**
+
+Zgodność wyników uzyskanych metodami parametrycznymi i nieparametrycznymi potwierdza **odrzucenie** hipotezy zerowej i wskazuje na istotne różnice kursu USDPLN pomiędzy analizowanymi miesiącami.
+
+***
+
+# Zadanie 2 (2 pkt)
+
+## Treść zadania
+
+Dla danych z ostatnich trzech miesięcy (od września do listopada 2025) korzystając z regresji liniowej wyznacz zależności:
+
+* kursu EURPLN od kursów USDPLN, GBPPLN, AUDPLN, JPYPLN,
+
+* kursu KGHM (KGH) od kursów EURPLN, USDPLN, GBPPLN. AUDPLN, JPYPLN. 
+
+Oceń istotność poszczególnych zmiennych objaśniających w tak skonstruowanych modelach.
+
+## Rozwiązanie
+
+Tu umieść swoje rozwiązanie.
+
+```{r}
+dateStart <- '2025-09-01'
+dateEnd   <- '2025-11-30'
+
+read_kursy <- function(Symbol, dateStart, dateEnd) {
+  webLink  <- paste0('https://stooq.pl/q/d/l/?s=', Symbol, '&i=d')
+  fileName <- paste0(Symbol, '.csv')
+  download.file(webLink, fileName, quiet = TRUE)
+  df <- read.csv(fileName)
+  df$Data <- as.Date(df$Data)
+  df <- subset(df, Data >= as.Date(dateStart) & Data <= as.Date(dateEnd))
+  df <- subset(df, select = c(Data, Zamkniecie))
+  names(df) <- c('Data', Symbol)
+  df
+}
+
+df_EUR <- read_kursy('EURPLN', dateStart, dateEnd)
+df_USD <- read_kursy('USDPLN', dateStart, dateEnd)
+df_GBP <- read_kursy('GBPPLN', dateStart, dateEnd)
+df_AUD <- read_kursy('AUDPLN', dateStart, dateEnd)
+df_JPY <- read_kursy('JPYPLN', dateStart, dateEnd)
+
+df_wal <- Reduce(function(x, y) merge(x, y, by = 'Data'),
+                 list(df_EUR, df_USD, df_GBP, df_AUD, df_JPY))
+
+lm_eur <- lm(EURPLN ~ USDPLN + GBPPLN + AUDPLN + JPYPLN, data = df_wal)
+summary(lm_eur)
+
+df_KGH <- read_kursy('KGH', dateStart, dateEnd)
+
+df_kgh <- merge(df_KGH, df_wal, by = 'Data')
+
+print(names(df_kgh))
+
+if(!"KGH" %in% names(df_kgh)) {
+  # znajdź kolumnę zaczynającą się od "KGH"
+  kgh_col <- grep("^KGH", names(df_kgh), value = TRUE)
+  names(df_kgh)[names(df_kgh) == kgh_col] <- "KGH"
+}
+
+lm_kgh <- lm(KGH ~ EURPLN + USDPLN + GBPPLN + AUDPLN + JPYPLN, data = df_kgh)
+summary(lm_kgh)
+```
+
+## WNIOSKI
+
+**Hipotezy:**
+
+$H_0$: Żadna ze zmiennych objaśniających (EURPLN, USDPLN, GBPPLN, AUDPLN, JPYPLN) nie ma istotnego wpływu na kurs akcji KGHM.
+
+$H_1$: Co najmniej jedna ze zmiennych objaśniających ma istotny statystycznie wpływ na kurs akcji KGHM.
+
+**Model 1: Regresja liniowa kursu EURPLN**
+Na podstawie przeprowadzonej regresji liniowej stwierdzono, że kurs EURPLN w analizowanym okresie istotnie statystycznie zależał od kursów USDPLN, AUDPLN oraz JPYPLN. Zmienna GBPPLN nie wykazała istotnego wpływu na poziomie istotności $\alpha = 0.05$. Model charakteryzuje się dobrym dopasowaniem do danych – współczynnik determinacji ($R^2\approx 0{,}78$), co oznacza, że wyjaśnia on około 78% zmienności kursu EURPLN. Test F potwierdził istotność modelu jako całości (p-value < 0,001). W związku z powyższym hipoteza zerowa **została odrzucona**.
+
+**Model 2: Regresja liniowa kursu akcji KGHM**
+W przypadku modelu regresji liniowej kursu akcji KGHM stwierdzono istotny statystycznie wpływ kursów USDPLN oraz JPYPLN. Pozostałe zmienne objaśniające, tj. EURPLN, GBPPLN oraz AUDPLN, nie wykazały istotnego wpływu na kurs akcji KGHM. Model wyjaśnia około 77% zmienności kursu akcji KGHM ($R^2\approx 0{,}77$) i jest istotny statystycznie jako całość, co potwierdza test F (p-value < 0,001). W związku z tym również w tym przypadku hipoteza zerowa **została odrzucona**.
+
+**Wnioski:**
+Oba skonstruowane modele regresji liniowej są istotne statystycznie i dobrze opisują zależności występujące w danych. Kursy USDPLN oraz JPYPLN odgrywały kluczową rolę w kształtowaniu zarówno kursu EURPLN, jak i kursu akcji KGHM w analizowanym okresie. Zgodność wyników oraz wysokie wartości współczynnika determinacji wskazują na dobrą jakość dopasowania modeli.
+
+***
+
+# Zadanie 3 (1,5 pkt.)
+
+## Treść zadania
+
+W pliku sprzedaz.txt znajdują się dane dotyczące wydatków na reklamę pewnej firmy (w tys. zł) i wartości sprzedaży jej produktów (w mln zł) w poszczególnych kwartałach.
+
+* Metodą regresji liniowej wyznacz zależność pomiędzy wartością sprzedaży a wydatkami na reklamę. Na jednym wykresie narysuj punkty odpowiadające danym oraz prostą regresji. 
+
+* Oblicz prognozowane wartości sprzedaży, jeśli wydatki na reklamę będą wynosiły: 300, 500, 700 tys. zł. Oszacuj odchylenie standardowe błędu z jakim wyznaczono prognozowane wartości sprzedaży dla poszczególnych wartości wydatków na reklamę.
+
+* Dla danych z pliku sprzedaz.txt zbadaj czy lepszym modelem zależności między wartością wydatków na reklamę (w tys. zł) a wartością sprzedaży (w mln zł) byłaby zależność kwadratowa. Porównaj wartości współczynnika determinacji $R^2$ dla obu modeli. Nanieś odpowiednią linię przedstawiającą tę zależność na rysunek z danymi oraz prostą regresji wyznaczoną w poprzednim punkcie.
+
+## Rozwiązanie
+
+Tu umieść swoje rozwiązanie
+
+```{r}
+df <- read.csv("sprzedaz.txt")
+str(df)
+head(df)
+names(df) <- c("kwartal", "reklama", "sprzedaz")
+
+df$reklama  <- as.numeric(df$reklama)
+df$sprzedaz <- as.numeric(df$sprzedaz)
+df <- na.omit(df)
+
+lm_sales <- lm(sprzedaz ~ reklama, data = df)
+summary(lm_sales)
+
+plot(df$reklama, df$sprzedaz,
+     xlab = "Wydatki na reklamę (tys. zł)",
+     ylab = "Sprzedaż (mln zł)",
+     main = "Sprzedaż vs reklama — regresja liniowa")
+abline(lm_sales, col = "pink", lwd = 2)
+grid()
+
+x_new <- data.frame(reklama = c(300, 500, 700))
+pred <- predict(lm_sales, x_new, se.fit = TRUE)
+
+s_y_new <- sqrt(pred$se.fit^2 + pred$residual.scale^2)
+
+wyniki <- data.frame(
+  wydatki_tys   = x_new$reklama,
+  prognoza_mln  = round(as.numeric(pred$fit), 2),
+  odch_std_mln  = round(as.numeric(s_y_new), 2)
+)
+print(wyniki)
+
+lm_sales_quad <- lm(sprzedaz ~ I(reklama^2), data = df)
+summary(lm_sales_quad)
+
+R2_lin  <- summary(lm_sales)$r.squared
+R2_quad <- summary(lm_sales_quad)$r.squared
+cat(sprintf("R^2 liniowy: %.4f; R^2 kwadratowy: %.4f\n", R2_lin, R2_quad))
+
+plot(df$reklama, df$sprzedaz,
+     xlab = "Wydatki na reklamę (tys. zł)",
+     ylab = "Sprzedaż (mln zł)",
+     main = "Liniowy vs kwadratowy model sprzedaży")
+grid()
+
+abline(lm_sales, col = "purple", lwd = 2)
+
+arg <- seq(min(df$reklama), max(df$reklama), length.out = 200)
+y_quad <- coef(lm_sales_quad)[2]*arg^2 + coef(lm_sales_quad)[1]
+lines(arg, y_quad, col = "green", lwd = 2)
+
+legend("topleft",
+       legend = c(sprintf("Liniowy (R^2=%.3f)", R2_lin),
+                  sprintf("Kwadratowy (R^2=%.3f)", R2_quad)),
+       col = c("purple","green"), lwd = 2, bty = "n")
+```
+
+## WNIOSKI
+
+**Hipotezy:**
+
+$H_0$: Nie istnieje istotna statystycznie zależność liniowa pomiędzy wydatkami na reklamę a wartością sprzedaży.  
+
+$H_1$: Istnieje istotna statystycznie zależność liniowa pomiędzy wydatkami na reklamę a wartością sprzedaży.
+
+**Zależność liniowa między wydatkami na reklamę a sprzedażą**
+
+Na podstawie estymacji modelu regresji liniowej stwierdzono istnienie silnej i istotnej statystycznie dodatniej zależności pomiędzy wydatkami na reklamę a wartością sprzedaży. Parametr przy zmiennej „reklama” jest istotny (p‑value = $1.41\cdot 10^{-11}$), co prowadzi do odrzucenia hipotezy zerowej. Oznacza to, że wzrost wydatków na reklamę o 1 tys. PLN powoduje średni wzrost sprzedaży o około 0,0146 mln PLN.
+
+Model charakteryzuje się bardzo dobrym dopasowaniem do danych – współczynnik determinacji $R^2\approx0{,}91$, co oznacza, że około 91% zmienności sprzedaży jest wyjaśnione przez zmienność wydatków na reklamę. Test F potwierdza istotność modelu jako całości (p‑value = $1.41\cdot 10^{-11}$). Wykres punktowy wraz z naniesioną prostą regresji potwierdza dodatnią, niemal liniową zależność pomiędzy analizowanymi zmiennymi.
+
+**Prognozowanie wartości sprzedaży**
+
+Na podstawie oszacowanego modelu liniowego wyznaczono prognozowane wartości sprzedaży dla zadanych poziomów wydatków na reklamę:  
+- 300 tys. PLN → sprzedaż $\approx$ 9,57 mln PLN ($blad\approx 0,64$ mln PLN),  
+- 500 tys. PLN → sprzedaż $\approx$ 12,50 mln PLN ($blad\approx 0,63$ mln PLN),  
+- 700 tys. PLN → sprzedaż $\approx$ 15,43 mln PLN ($blad\approx 0,68$ mln PLN).  
+
+Prognozy cechują się stosunkowo niewielką niepewnością, choć wraz z oddalaniem się od centralnego zakresu danych obserwuje się nieznaczny wzrost błędu prognozy.
+
+**Porównanie modelu liniowego i kwadratowego**
+
+W kolejnym etapie rozważono model kwadratowy opisujący zależność pomiędzy wartością sprzedaży a wydatkami na reklamę. Parametr przy składniku kwadratowym okazał się istotny (p‑value = $1.41\cdot 10^{-12}$), co wskazuje na możliwość nieliniowego charakteru zależności.
+
+Porównanie współczynników determinacji wykazało, że model kwadratowy lepiej dopasowuje się do danych niż model liniowy. Różnica ta sugeruje, że zależność pomiędzy wydatkami na reklamę a sprzedażą może mieć charakter lekko nieliniowy. Na wykresie przedstawiono zarówno prostą regresji liniowej, jak i krzywą regresji kwadratowej, co umożliwia wizualne porównanie obu modeli.
+
+**Wnioski:**
+
+Przeprowadzona analiza **potwierdziła** istnienie istotnej i silnej zależności pomiędzy wydatkami na reklamę a wartością sprzedaży. Model liniowy bardzo dobrze opisuje dane i pozwala na precyzyjne prognozowanie sprzedaży. Model kwadratowy zapewnia nieco lepsze dopasowanie, jednak ze względu na niewielką różnicę wartości współczynnika determinacji oraz prostotę interpretacji, model liniowy może być uznany za wystarczający w praktycznych zastosowaniach.
+
+***
